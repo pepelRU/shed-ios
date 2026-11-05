@@ -27,7 +27,28 @@ final class ScheduleRemoteDataSource {
         guard let url = components?.url else {
             throw ScheduleError.network("Некорректный адрес сайта изменений")
         }
-        return try await fetch(url)
+        let html = try await fetch(url)
+        if isCaptcha(html) {
+            throw ScheduleError.source(
+                "Сайт запросил проверку (капча). Открой сайт в Safari один раз и повтори обновление."
+            )
+        }
+        if html.contains("/timetable/Changes/")
+            || html.localizedCaseInsensitiveContains("Не удалось получить изменения") {
+            return html
+        }
+        // URLSession may receive only the Blazor shell; render it once in WebKit.
+        do {
+            return try await renderer.renderIndex(url)
+        } catch {
+            throw ScheduleError.source("Сайт не отдал страницу изменений. \(error.localizedDescription)")
+        }
+    }
+
+    private func isCaptcha(_ html: String) -> Bool {
+        html.localizedCaseInsensitiveContains("Вы не робот")
+            || html.localizedCaseInsensitiveContains("smartcaptcha")
+            || html.localizedCaseInsensitiveContains("checkcaptcha")
     }
 
     func loadChangesPages(

@@ -67,6 +67,8 @@ struct SettingsView: View {
                 divider
                 updateRow
                 divider
+                diagnostics
+                divider
 
                 Text("Shed · версия \(version)")
                     .font(.caption)
@@ -184,6 +186,52 @@ struct SettingsView: View {
             }
         }
         .padding(.vertical, 6)
+    }
+
+    private var diagnostics: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 10) {
+                iconBadge("waveform.path.ecg")
+                Text("Диагностика")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(ShedColors.text)
+            }
+            Text(diagnosticsText)
+                .font(.caption)
+                .foregroundStyle(ShedColors.muted)
+            if let error = repository.snapshot.errorMessage, !error.isEmpty {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(ShedColors.error)
+            }
+            Button {
+                Haptics.tick()
+                Task { await repository.refresh() }
+            } label: {
+                HStack(spacing: 7) {
+                    if repository.snapshot.isRefreshing {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                    Text(repository.snapshot.isRefreshing ? "Обновляю…" : "Обновить сейчас")
+                        .font(.caption.weight(.semibold))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 9)
+                .background(ShedColors.surfaceVariant, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .foregroundStyle(ShedColors.primary)
+            }
+            .buttonStyle(.plain)
+            .disabled(repository.snapshot.isRefreshing)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var diagnosticsText: String {
+        let checked = repository.snapshot.changesCheckedAt
+            .map { DateFormatters.updated.string(from: $0) } ?? "ещё не проверялось"
+        let source = repository.snapshot.fromCache ? "кэш" : "сеть"
+        return "Проверено: \(checked) · дней: \(repository.snapshot.days.count) · источник: \(source)"
     }
 
     private var updateStatusText: String {

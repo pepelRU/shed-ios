@@ -48,6 +48,16 @@ final class ScheduleRepository: ObservableObject {
         }
     }
 
+    /// Refreshes on launch and after returning to the app, but not more often
+    /// than the given interval.
+    func refreshIfStale(interval: TimeInterval = 2 * 60) async {
+        if let checked = snapshot.changesCheckedAt,
+           Date().timeIntervalSince(checked) < interval {
+            return
+        }
+        _ = await refresh()
+    }
+
     @discardableResult
     func refresh() async -> ScheduleRefreshResult {
         guard !snapshot.isRefreshing else {
@@ -105,7 +115,16 @@ final class ScheduleRepository: ObservableObject {
         let dates = ScheduleDatePolicy.changesWindow(today: today, period: preferences.refreshPeriod)
 
         if let dnevnik, dnevnik.hasSession {
-            return try await loadDnevnik(dnevnik, group: group, dates: dates)
+            do {
+                return try await loadDnevnik(dnevnik, group: group, dates: dates)
+            } catch let error as DnevnikScheduleError {
+                if error.code == "auth_required" {
+                    dnevnik.forgetSession()
+                    dnevnikAuth?.sessionInvalidated()
+                }
+                // Dnevnik is a bonus source: fall back to the base + published
+                // changes instead of leaving the user without an update.
+            }
         }
 
         refreshStage = .checkingPublishedDates
@@ -121,22 +140,39 @@ final class ScheduleRepository: ObservableObject {
 
         refreshStage = .loadingChanges
         var changesByDate: [Date: ScheduleChangeSet] = [:]
+        var failures: [String] = []
         refreshProgress = ScheduleRefreshProgress(
             current: publishedDates.isEmpty ? 0 : 1,
             total: publishedDates.count
         )
 
-        try await remote.loadChangesPages(dates: publishedDates) { position, date, html in
-            let changes = try parser.parseChanges(html: html, date: date, group: group)
-            guard changes.available else {
+        for (position, date) in publishedDates.enumerated() {
+            do {
+                let html = try await remote.loadChangesPage(date: date)
+                let changes = try parser.parseChanges(html: html, date: date, group: group)
+                if changes.available {
+                    changesByDate[date] = changes
+                } else {
+                    let formatted = DateFormatters.dayMonth.string(from: date)
+                    failures.append("\(formatted): изменения не загрузились")
+                }
+            } catch {
                 let formatted = DateFormatters.dayMonth.string(from: date)
-                throw ScheduleError.source("Изменения за \(formatted) не загрузились")
+                failures.append("\(formatted): \(error.localizedDescription)")
             }
-            changesByDate[date] = changes
+
             refreshProgress = ScheduleRefreshProgress(
                 current: min(position + 2, publishedDates.count),
                 total: publishedDates.count
             )
+            if position < publishedDates.count - 1 {
+                // Keep the college site from being hammered by the browser.
+                try await Task.sleep(nanoseconds: 800_000_000)
+            }
+        }
+
+        if changesByDate.isEmpty, !publishedDates.isEmpty, let firstFailure = failures.first {
+            throw ScheduleError.source("Не удалось загрузить изменения. \(firstFailure)")
         }
 
         refreshStage = .applyingChanges
@@ -169,17 +205,8 @@ final class ScheduleRepository: ObservableObject {
     ) async throws -> ScheduleSnapshot {
         refreshStage = .loadingChanges
         refreshProgress = ScheduleRefreshProgress(current: 0, total: dates.count)
-        let days: [ScheduleDay]
-        do {
-            days = try await source.load(dates: dates) { [weak self] done, total in
-                self?.refreshProgress = ScheduleRefreshProgress(current: done, total: total)
-            }
-        } catch let error as DnevnikScheduleError {
-            if error.code == "auth_required" {
-                source.forgetSession()
-                dnevnikAuth?.sessionInvalidated()
-            }
-            throw ScheduleError.source(error.message)
+        let days = try await source.load(dates: dates) { [weak self] done, total in
+            self?.refreshProgress = ScheduleRefreshProgress(current: done, total: total)
         }
 
         refreshStage = .applyingChanges

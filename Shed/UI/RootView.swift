@@ -21,6 +21,8 @@ enum ScheduleMode: String, CaseIterable, Identifiable {
 struct RootView: View {
     @EnvironmentObject private var repository: ScheduleRepository
     @EnvironmentObject private var preferences: SchedulePreferences
+    @EnvironmentObject private var dnevnikAuth: DnevnikAuth
+    @EnvironmentObject private var updateChecker: UpdateChecker
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var mode: ScheduleMode = .today
@@ -36,6 +38,8 @@ struct RootView: View {
             SettingsView()
                 .environmentObject(preferences)
                 .environmentObject(repository)
+                .environmentObject(dnevnikAuth)
+                .environmentObject(updateChecker)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
@@ -45,17 +49,11 @@ struct RootView: View {
                 .presentationDragIndicator(.visible)
         }
         .task {
-            await repository.refreshBaseIfNeeded()
+            await repository.refreshIfStale()
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
-            Task {
-                if let checked = repository.snapshot.changesCheckedAt,
-                   Date().timeIntervalSince(checked) < 10 * 60 {
-                    return
-                }
-                await repository.refresh()
-            }
+            Task { await repository.refreshIfStale() }
         }
     }
 
@@ -106,8 +104,9 @@ struct RootView: View {
                 await repository.refresh()
             }
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 16)
         .padding(.top, 4)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     // MARK: - Header
@@ -152,32 +151,31 @@ struct RootView: View {
     }
 
     private func modePicker(actualDay: Date, today: Date) -> some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 2) {
             ForEach(ScheduleMode.allCases) { item in
                 let selected = item == mode
                 Button {
                     guard !selected else { return }
                     Haptics.selection()
-                    withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
                         mode = item
                     }
                 } label: {
-                    VStack(spacing: 6) {
-                        Text(tabTitle(item, actualDay: actualDay, today: today))
-                            .font(.system(size: 12, weight: selected ? .bold : .medium))
-                            .foregroundStyle(selected ? ShedColors.primary : ShedColors.muted)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                        Capsule()
-                            .fill(selected ? ShedColors.primary : Color.clear)
-                            .frame(width: 28, height: 3)
-                    }
-                    .frame(maxWidth: .infinity)
+                    Text(tabTitle(item, actualDay: actualDay, today: today))
+                        .font(.system(size: 12, weight: selected ? .bold : .medium))
+                        .foregroundStyle(selected ? ShedColors.onPrimary : ShedColors.muted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(selected ? ShedColors.primary : Color.clear, in: Capsule())
                 }
                 .buttonStyle(.plain)
             }
         }
-        .frame(height: 42)
+        .padding(3)
+        .background(ShedColors.surfaceVariant.opacity(0.7), in: Capsule())
+        .padding(.bottom, 2)
     }
 
     // MARK: - Freshness
@@ -212,8 +210,10 @@ struct RootView: View {
             }
         }
         .foregroundStyle(tint)
-        .padding(.horizontal, 4)
-        .padding(.vertical, 11)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .background(ShedColors.surfaceVariant.opacity(0.45), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.top, 8)
         .contentShape(Rectangle())
         .onTapGesture {
             guard !snapshot.isRefreshing else { return }
@@ -229,7 +229,7 @@ struct RootView: View {
         if day.lessons.isEmpty {
             emptyState("Занятий нет", compact: compact)
         } else {
-            ForEach(Array(day.lessons.enumerated()), id: \.element.id) { index, lesson in
+            ForEach(Array(day.lessons.enumerated()), id: \.offset) { index, lesson in
                 LessonBandView(
                     lesson: lesson,
                     date: day.date,
@@ -252,10 +252,21 @@ struct RootView: View {
     }
 
     private func weekHeader(_ day: ScheduleDay, today: Date) -> some View {
-        HStack(spacing: 8) {
+        let isToday = ScheduleCalendar.sameDay(day.date, today)
+        let isPast = ScheduleCalendar.startOfDay(day.date) < ScheduleCalendar.startOfDay(today)
+        return HStack(spacing: 8) {
             Text("\(weekdayTitle(day.date)), \(DateFormatters.humanDate.string(from: day.date))")
                 .font(.subheadline.weight(.black))
-                .foregroundStyle(ScheduleCalendar.sameDay(day.date, today) ? ShedColors.primary : ShedColors.text)
+                .foregroundStyle(isToday ? ShedColors.primary : (isPast ? ShedColors.muted : ShedColors.text))
+            if isToday {
+                Text("СЕГОДНЯ")
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(0.4)
+                    .foregroundStyle(ShedColors.onPrimary)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(ShedColors.primary, in: Capsule())
+            }
             if day.hasChanges {
                 Circle()
                     .fill(ShedColors.error)
@@ -268,11 +279,16 @@ struct RootView: View {
     }
 
     private func emptyState(_ text: String, compact: Bool = false) -> some View {
-        Text(text)
-            .font(.subheadline.weight(.medium))
-            .foregroundStyle(ShedColors.muted)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, compact ? 14 : 42)
+        VStack(spacing: 8) {
+            Image(systemName: "calendar")
+                .font(.title3)
+                .foregroundStyle(ShedColors.muted.opacity(0.7))
+            Text(text)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(ShedColors.muted)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, compact ? 18 : 42)
     }
 
     private func resolveDay(_ snapshot: ScheduleSnapshot, _ date: Date) -> ScheduleDay? {
@@ -338,6 +354,7 @@ struct LessonBandView: View {
                     Text(lesson.subject.isEmpty ? "Занятие" : lesson.subject)
                         .font(.system(size: compact ? 16 : 17, weight: .bold))
                         .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                         .strikethrough(lesson.cancelled)
                         .foregroundStyle(ShedColors.text)
                     if !lesson.teacher.isEmpty {
@@ -350,6 +367,7 @@ struct LessonBandView: View {
                 .padding(.horizontal, compact ? 10 : 12)
                 .padding(.vertical, compact ? 8 : 10)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .layoutPriority(1)
 
                 VStack(alignment: .trailing, spacing: 3) {
                     if lesson.changed || lesson.cancelled {
@@ -375,8 +393,12 @@ struct LessonBandView: View {
         }
         .background(background(current: current, cancelled: lesson.cancelled))
         .clipShape(RoundedRectangle(cornerRadius: 17, style: .continuous))
-        .opacity(passed ? 0.62 : 1)
-        .padding(.bottom, 2)
+        .overlay(
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .stroke(ShedColors.outline.opacity(0.45), lineWidth: 0.5)
+        )
+        .opacity(passed ? 0.8 : 1)
+        .padding(.bottom, 3)
         .contentShape(Rectangle())
         .onTapGesture {
             if lesson.changed { onTap() }
@@ -474,7 +496,7 @@ struct ChangesDialog: View {
                     .buttonStyle(.plain)
                 }
 
-                ForEach(changed) { lesson in
+                ForEach(Array(changed.enumerated()), id: \.offset) { _, lesson in
                     VStack(alignment: .leading, spacing: 5) {
                         Text("\(lesson.number)-я пара · \(lesson.subject)")
                             .font(.subheadline.weight(.bold))

@@ -60,7 +60,9 @@ enum ScheduleDatePolicy {
         case .nextDay:
             return [tomorrowTarget(actual)]
         case .week:
-            return actualDays(schoolWeek(actual), actualDay: actual)
+            // The week tab shows the whole week. Past days stay visible but muted,
+            // so the list never looks empty after the first pair.
+            return schoolWeek(actual)
         case .nextWeek:
             return schoolWeek(actual, weeksFromCurrent: 1)
         }

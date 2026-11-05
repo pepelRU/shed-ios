@@ -1,0 +1,17 @@
+# Android reference source — not part of the iOS app, must not go to the public repo
+ShedAndroid/
+
+# Xcode
+build/
+DerivedData/
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+*.xcuserstate
+*.ipa
+
+# XcodeGen generated plist
+Support/Info.plist
+
+# macOS
+.DS_Store

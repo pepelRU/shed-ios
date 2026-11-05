@@ -22,6 +22,8 @@ enum DnevnikPolicy {
         return dnevnikHosts.contains(host)
             || host == "gosuslugi.ru"
             || host.hasSuffix(".gosuslugi.ru")
+            || host == "omskportal.ru"
+            || host.hasSuffix(".omskportal.ru")
     }
 
     static func upgradedSchoolURL(_ url: URL) -> URL? {
@@ -37,5 +39,12 @@ enum DnevnikPolicy {
     static func scheduleReached(_ url: URL) -> Bool {
         guard allowedNavigation(url), url.host?.lowercased() == "schools.dnevnik.ru" else { return false }
         return url.path == "/v2/schedules/view" || url.path == "/v2/r/omsk/schedules/view"
+    }
+
+    /// After the ESIA redirect the browser may land on a Dnevnik landing page
+    /// without the school cookie. The schedule page forces it to be issued.
+    static func canOpenSchedule(_ url: URL) -> Bool {
+        guard allowedNavigation(url), let host = url.host?.lowercased() else { return false }
+        return host.hasSuffix("dnevnik.ru") && !scheduleReached(url)
     }
 }

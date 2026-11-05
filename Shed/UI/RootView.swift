@@ -410,12 +410,9 @@ struct BreakView: View {
         let nowMinutes = ScheduleCalendar.minutesOfDay(now)
         let remaining = max(until - nowMinutes, 0)
         let elapsed = Double(min(max(nowMinutes - from, 0), total)) / Double(total)
-        let label: String
-        if current {
-            label = remaining < 1 ? "<1 мин" : "до конца \(remaining) мин"
-        } else {
-            label = "\(total) мин"
-        }
+        let label = current
+            ? (remaining < 1 ? "<1 мин" : "до конца \(remaining) мин")
+            : "\(total) мин"
 
         HStack(spacing: 0) {
             Rectangle()

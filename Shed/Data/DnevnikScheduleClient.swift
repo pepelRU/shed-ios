@@ -44,15 +44,16 @@ final class DnevnikScheduleClient {
         request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) Shed/1.0", forHTTPHeaderField: "User-Agent")
 
         let redirectGuard = DnevnikRedirectGuard()
-        let data: Data
-        let response: URLResponse
+        let result: (Data, URLResponse)
         do {
-            (data, response) = try await session.data(for: request, delegate: redirectGuard)
+            result = try await session.data(for: request, delegate: redirectGuard)
         } catch is CancellationError {
             throw CancellationError()
         } catch {
             throw DnevnikScheduleError(code: "network", message: "Не удалось загрузить расписание Дневник.ру")
         }
+        let data = result.0
+        let response = result.1
 
         guard let http = response as? HTTPURLResponse else {
             throw DnevnikScheduleError(code: "network", message: "Не удалось загрузить расписание Дневник.ру")
@@ -109,8 +110,6 @@ final class DnevnikScheduleClient {
         guard let groups = charsetRegex.first(in: contentType), groups.count > 1 else { return .utf8 }
         switch groups[1].lowercased() {
         case "windows-1251", "cp1251": return .windowsCP1251
-        case "koi8-r": return .koi8R
-        case "iso-8859-5": return .isoLatinCyrillic
         default: return .utf8
         }
     }

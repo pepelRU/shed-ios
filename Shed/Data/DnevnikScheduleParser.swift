@@ -148,9 +148,11 @@ enum DnevnikScheduleParser {
     static func join(week: DnevnikTable, semester: DnevnikTable) throws -> [Date: [DnevnikSlot]] {
         let index = Dictionary(semester.lessons.map { ($0.id, $0) }) { _, last in last }
         let weekIds = Set(week.lessons.map(\.id))
-        for lesson in semester.lessons
-        where week.dates.contains(where: { ScheduleCalendar.sameDay($0, lesson.date) }) && !weekIds.contains(lesson.id) {
-            throw markup("semester")
+        for lesson in semester.lessons {
+            let belongsToWeek = week.dates.contains { ScheduleCalendar.sameDay($0, lesson.date) }
+            if belongsToWeek && !weekIds.contains(lesson.id) {
+                throw markup("semester")
+            }
         }
 
         var joined: [DnevnikLesson] = []

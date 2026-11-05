@@ -45,7 +45,7 @@ final class DnevnikScheduleSource {
             let slots = try DnevnikScheduleParser.join(week: week, semester: semesterTable)
 
             for date in dates where weekDates.contains(where: { ScheduleCalendar.sameDay($0, date) }) {
-                let lessons = (slots[date] ?? []).compactMap(lesson)
+                let lessons = (slots[date] ?? []).compactMap { lesson($0) }
                 days[date] = ScheduleDay(
                     date: date,
                     group: groupName,

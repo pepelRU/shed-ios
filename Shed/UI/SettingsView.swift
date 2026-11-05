@@ -121,36 +121,54 @@ struct SettingsView: View {
     }
 
     private var dnevnikRow: some View {
-        HStack(spacing: 12) {
-            iconBadge("graduationcap.fill")
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Дневник.ру")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ShedColors.text)
-                Text(dnevnikAuth.isSignedIn
-                    ? dnevnikAuth.state.message
-                    : "Вход через Госуслуги. Пароль Shed не читает и не сохраняет.")
-                    .font(.caption)
-                    .foregroundStyle(ShedColors.muted)
-                    .lineLimit(2)
-            }
-            Spacer()
-            if dnevnikAuth.isSignedIn {
-                Button("Выйти") {
-                    Haptics.tick()
-                    dnevnikAuth.signOut()
-                    Task { await repository.refresh() }
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 12) {
+                iconBadge("graduationcap.fill")
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Дневник.ру")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ShedColors.text)
+                    Text(dnevnikAuth.isSignedIn
+                        ? dnevnikAuth.state.message
+                        : "Вход откроется в Safari. Пароль Shed не читает и не сохраняет.")
+                        .font(.caption)
+                        .foregroundStyle(ShedColors.muted)
+                        .lineLimit(2)
                 }
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ShedColors.error)
-                .buttonStyle(.plain)
-            } else {
-                Button("Войти") {
+                Spacer()
+                if dnevnikAuth.isSignedIn {
+                    Button("Выйти") {
+                        Haptics.tick()
+                        dnevnikAuth.signOut()
+                        Task { await repository.refresh() }
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ShedColors.error)
+                    .buttonStyle(.plain)
+                } else {
+                    Link("Войти", destination: DnevnikPolicy.loginURL)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ShedColors.primary)
+                }
+            }
+
+            if !dnevnikAuth.isSignedIn {
+                Text("Safari не передаёт cookie приложению. Чтобы Shed читал расписание Дневник.ру, нужно подключить его внутри приложения.")
+                    .font(.caption2)
+                    .foregroundStyle(ShedColors.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Button {
                     Haptics.tick()
                     showLogin = true
+                } label: {
+                    Text("Подключить в приложении")
+                        .font(.caption.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(ShedColors.surfaceVariant, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .foregroundStyle(ShedColors.primary)
                 }
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ShedColors.primary)
                 .buttonStyle(.plain)
             }
         }

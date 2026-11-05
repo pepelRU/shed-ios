@@ -7,8 +7,6 @@ struct SettingsView: View {
     @EnvironmentObject private var dnevnikAuth: DnevnikAuth
     @EnvironmentObject private var updateChecker: UpdateChecker
 
-    @State private var showLogin = false
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
@@ -80,15 +78,6 @@ struct SettingsView: View {
             .padding(.bottom, 28)
         }
         .background(ShedColors.background.ignoresSafeArea())
-        .fullScreenCover(isPresented: $showLogin) {
-            DnevnikLoginView { success in
-                showLogin = false
-                if success {
-                    Task { await repository.refresh() }
-                }
-            }
-            .environmentObject(dnevnikAuth)
-        }
     }
 
     private var header: some View {
@@ -127,7 +116,9 @@ struct SettingsView: View {
                 Text("Дневник.ру")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ShedColors.text)
-                Text(dnevnikAuth.state.message)
+                Text(dnevnikAuth.isSignedIn
+                    ? dnevnikAuth.state.message
+                    : "Вход откроется в Safari. Приложение работает от сайта колледжа.")
                     .font(.caption)
                     .foregroundStyle(ShedColors.muted)
                     .lineLimit(2)
@@ -143,13 +134,9 @@ struct SettingsView: View {
                 .foregroundStyle(ShedColors.error)
                 .buttonStyle(.plain)
             } else {
-                Button("Войти") {
-                    Haptics.tick()
-                    showLogin = true
-                }
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ShedColors.primary)
-                .buttonStyle(.plain)
+                Link("Войти", destination: DnevnikPolicy.loginURL)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ShedColors.primary)
             }
         }
         .padding(.vertical, 6)

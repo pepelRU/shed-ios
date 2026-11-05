@@ -75,6 +75,7 @@ struct DnevnikLoginView: View {
                 onPageFinished: { model.pageFinished(auth: auth) },
                 onBlocked: { model.blocked($0) }
             )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .padding(.horizontal, 10)
             .padding(.bottom, 8)

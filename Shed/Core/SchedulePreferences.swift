@@ -49,7 +49,7 @@ final class SchedulePreferences: ObservableObject {
         self.defaults = defaults
         let storedSubgroup = defaults.integer(forKey: Keys.subgroup)
         subgroup = (1...2).contains(storedSubgroup) ? storedSubgroup : 1
-        refreshPeriod = ScheduleRefreshPeriod(rawValue: defaults.string(forKey: Keys.refreshPeriod) ?? "") ?? .todayAndTomorrow
+        refreshPeriod = ScheduleRefreshPeriod(rawValue: defaults.string(forKey: Keys.refreshPeriod) ?? "") ?? .currentWeek
         themeMode = ThemeMode(rawValue: defaults.string(forKey: Keys.themeMode) ?? "") ?? .system
     }
 

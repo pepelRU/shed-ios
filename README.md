@@ -29,7 +29,7 @@ SwiftUI, минимальная версия iOS 26.0. Сборка — GitHub A
 2. Запушь проект:
 
    ```bash
-   git remote add origin https://github.com/ТВОЙ_НИК/ИМЯ_РЕПО.git
+   git remote add origin https://github.com/pepelnefor-del/shed-ios.git
    git push -u origin main
    ```
 
@@ -37,21 +37,21 @@ SwiftUI, минимальная версия iOS 26.0. Сборка — GitHub A
 4. После сборки открой **Releases → Latest build** и скачай `Shed.ipa` прямо с iPhone:
 
    ```
-   https://github.com/ТВОЙ_НИК/ИМЯ_РЕПО/releases/download/latest/Shed.ipa
+   https://github.com/pepelnefor-del/shed-ios/releases/download/latest/Shed.ipa
    ```
 
 5. В LiveContainer нажми **+** и выбери скачанный `.ipa`.
 
 ## Если хочешь поменять репозиторий обновлений
 
-В `project.yml` найди `UpdateManifestURL` и замени `theekairo/shed-ios` на свой репозиторий.
+В `project.yml` найди `UpdateManifestURL` и замени `pepelnefor-del/shed-ios` на свой репозиторий.
 В `update-ios.json` лежит манифест версии:
 
 ```json
 {
   "build": 2,
   "version": "1.1",
-  "url": "https://github.com/ТВОЙ_НИК/ИМЯ_РЕПО/releases/latest",
+  "url": "https://github.com/pepelnefor-del/shed-ios/releases/latest",
   "notes": "Что нового"
 }
 ```

@@ -41,7 +41,7 @@ targets:
         BGTaskSchedulerPermittedIdentifiers:
           - dev.shed.schedule.refresh
         ITSAppUsesNonExemptEncryption: false
-        UpdateManifestURL: "https://raw.githubusercontent.com/theekairo/shed-ios/main/update-ios.json"
+        UpdateManifestURL: "https://raw.githubusercontent.com/pepelnefor-del/shed-ios/main/update-ios.json"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.shed.schedule
